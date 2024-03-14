@@ -41,6 +41,7 @@ class ProductCreateView(APIView):
             "price": data["price"],
             "stock": data["stock"],
             "image": data["image"],
+            "quantity": data["quantity"],
         }
 
         serializer = ProductSerializer(data=product, many=False)
@@ -86,3 +87,4 @@ class ProductEditView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response({"detail": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        

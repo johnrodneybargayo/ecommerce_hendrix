@@ -1,7 +1,6 @@
 Django==3.2.12
 django-adminlte3==0.1.6
 django-cors-headers==3.9.0
-psycopg2==2.9.1
 djangorestframework-simplejwt==5.3.1
 djangorestframework==3.14.0
 asgiref==3.3.4

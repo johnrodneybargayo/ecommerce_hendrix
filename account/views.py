@@ -7,6 +7,8 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import authentication, permissions
 
+from django.contrib.auth.hashers import make_password
+
 from .models import StripeModel, BillingAddress, OrderModel
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password, check_password
@@ -29,6 +31,7 @@ class HomeView(APIView):
 # register user
 # import statements ...
 
+
 class UserRegisterView(APIView):
     """To Register the User"""
 
@@ -36,10 +39,10 @@ class UserRegisterView(APIView):
         data = request.data  # holds username, email, password, and termsChecked
         username = data["username"]
         email = data["email"]
-        hashed_password = data.get("hashedPassword")
+        plain_password = data.get("password")  # Change to 'password' instead of 'hashedPassword'
         terms_checked = data.get("termsChecked", False)
 
-        if username == "" or email == "" or hashed_password == "" or not terms_checked:
+        if username == "" or email == "" or plain_password == "" or not terms_checked:
             return Response({"detail": "Incomplete or missing registration information"}, status=status.HTTP_400_BAD_REQUEST)
 
         else:
@@ -56,7 +59,8 @@ class UserRegisterView(APIView):
                 user = User.objects.create(
                     username=username,
                     email=email,
-                    password=make_password(hashed_password),
+                    password=make_password(plain_password),
+                    is_active=True,
                 )
 
                 # Additional steps for termsChecked field

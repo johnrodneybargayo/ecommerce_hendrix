@@ -9,6 +9,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', HomeView.as_view(), name='hendrix_armada_index'),
     path('api/', include('product.urls')),
+    path('cart/', include('cart.urls')),
     path('payments/', include('payments.urls')),
     path('account/', include('account.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
