@@ -1,57 +1,88 @@
-from rest_framework import generics, status
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from .models import CartItem, Cart, Product
-from .serializers import CartItemSerializer, ProductSerializer, CartSerializer
+from rest_framework import status
+from .models import Cart, CartItem
+from .serializers import CartItemSerializer
+from product.models import Product
+from django.contrib.auth.models import AnonymousUser
 
-class ProductListAPIView(generics.ListAPIView):
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
+class AddToCartAPIView(APIView):
+    def post(self, request, product_id):
+        user = request.user
+        if isinstance(user, AnonymousUser):
+            cart, created = Cart.objects.get_or_create(user=None)
+        else:
+            cart, created = Cart.objects.get_or_create(user=user)
 
-class AddToCartAPIView(generics.CreateAPIView):
-    queryset = CartItem.objects.all()
-    serializer_class = CartItemSerializer
-    permission_classes = [IsAuthenticated]  # Ensure user is authenticated
-
-    def create(self, request, *args, **kwargs):
-        # Extract product_id and quantity from the request data
-        product_id = request.data.get('product_id')
-        quantity = request.data.get('quantity', 1)
-
-        # Validate that product_id is provided
-        if not product_id:
-            return Response({"error": "Product ID is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            # Retrieve the product using the provided product_id
-            product = Product.objects.get(id=product_id)
-        except Product.DoesNotExist:
-            return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        # Get or create the user's cart
-        cart, _ = Cart.objects.get_or_create(user=request.user if request.user.is_authenticated else None)
-
-        # Get or create the cart item for the product
-        cart_item, created = CartItem.objects.get_or_create(
-            product=product,
-            cart=cart,
-            defaults={'quantity': quantity}
-        )
-
-        # If the cart item already exists, update the quantity
+        product = get_object_or_404(Product, pk=product_id)
+        cart_item, created = CartItem.objects.get_or_create(cart=cart, product=product)
         if not created:
-            cart_item.quantity += quantity
+            cart_item.quantity += 1
             cart_item.save()
-
-        # Serialize the cart item and return the response
         serializer = CartItemSerializer(cart_item)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-class CartDetailAPIView(generics.RetrieveAPIView):
-    queryset = Cart.objects.all()
-    serializer_class = CartSerializer
-   # permission_classes = [IsAuthenticated]  # Ensure user is authenticated
+class CartItemsAPIView(APIView):
+    def get(self, request):
+        user = request.user
+        if isinstance(user, AnonymousUser):
+            cart = Cart.objects.filter(user=None).first()
+        else:
+            cart = Cart.objects.filter(user=user).first()
 
-    def get_object(self):
-        # Retrieve the cart associated with the authenticated user
-        return self.request.user.cart
+        if cart:
+            cart_items = cart.cartitem_set.all()
+            serializer = CartItemSerializer(cart_items, many=True)
+            return Response(serializer.data)
+        return Response([], status=status.HTTP_200_OK)
+
+class UpdateCartItemQuantityAPIView(APIView):
+    def put(self, request, cart_item_id):
+        data = request.data
+        new_quantity = data.get('quantity')
+        cart_item = get_object_or_404(CartItem, pk=cart_item_id)
+        cart_item.quantity = new_quantity
+        cart_item.save()
+        serializer = CartItemSerializer(cart_item)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class RemoveCartItemAPIView(APIView):
+    def delete(self, request, cart_item_id):
+        cart_item = get_object_or_404(CartItem, pk=cart_item_id)
+        cart_item.delete()
+        return Response({"message": "Item removed from cart"}, status=status.HTTP_204_NO_CONTENT)
+
+class CartItemAPIView(APIView):
+    def get_cart(self, request):
+        user = request.user
+        if isinstance(user, AnonymousUser):
+            return Cart.objects.filter(user=None).first()
+        else:
+            return Cart.objects.filter(user=user).first()
+
+    def get(self, request):
+        cart = self.get_cart(request)
+        if cart:
+            cart_items = cart.cartitem_set.all()
+            serializer = CartItemSerializer(cart_items, many=True)
+            return Response(serializer.data)
+        return Response([], status=status.HTTP_200_OK)
+
+    def put(self, request, product_id):
+        cart = self.get_cart(request)
+        if not cart:
+            return Response({"message": "Cart not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        product = get_object_or_404(Product, pk=product_id)
+        cart_item, created = CartItem.objects.get_or_create(cart=cart, product=product)
+        if not created:
+            cart_item.quantity += 1
+            cart_item.save()
+        serializer = CartItemSerializer(cart_item)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    def delete(self, request, cart_item_id):
+        cart_item = get_object_or_404(CartItem, pk=cart_item_id)
+        cart_item.delete()
+        return Response({"message": "Item removed from cart"}, status=status.HTTP_204_NO_CONTENT)
